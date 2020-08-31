@@ -1,36 +1,17 @@
-// Récursivité
-// 1.a) Tant qu'on peut déplacer jetons de la 1ere pile on les déplace
-// 1.b) Tant qu'on peut déplacer jetons de 2nde pile on déplace
-// Privilégier les mouvements vers l'avant à ceux vers l'arrière
-// Privilégier les mouvements les + courts possibles (while?)
-// // Faire ces mouvements en interdisant retour arrière (garder en memoire derniere configuration de chaque pile -> memo?)
-
-// 2. Tant qu'on peut déplacer jetons de 3eme pile on déplace
-// Reculer prioritairement jusqu'à 1ere pile
-
-// règles communes :
-// ne pas déplacer un jeton qui vient d'être déplacé
-
-// 3. Recommencer (recursif)
-
-// 4. Obtenir résultat
-
 type Disk = number;
 type Stake = Disk[];
-type Game = Stake[];
+type AllStakes = Stake[];
 
 const main = (size: number) => {
-  let game = _initGame(size);
+  let input = _initStakes(size);
+  console.log(`------------> INIT STATE: [${JSON.stringify(input)}]`);
 
-  console.log("------------> INIT GAME");
-  console.log(game);
-
-  const res = handleStacks(game);
-  console.log("------------> MAIN RES");
-  console.log(res.first());
+  const output = _handleAllStakes()(input).first();
+  console.log(`------------> REORDERED STATE: ${JSON.stringify(output)}`);
+  return output;
 };
 
-const _initGame = (size: number) => {
+const _initStakes = (size: number) => {
   return [_createStake(size), _createStake(0), _createStake(0)];
 };
 
@@ -42,68 +23,72 @@ const _createStake = (size: number): Stake => {
   return disks;
 };
 
-const handleStacks = (game: Game) => {
-  let gameClone = [...game];
-  const handleStakes = _handleStake(gameClone);
-  const isCompleted = _isCompleted(gameClone);
-
-  return {
-    ["first"]: () => {
-      if (isCompleted()) return gameClone;
-      const firstRes = handleStakes.first();
-      if (firstRes !== null) return handleStacks(firstRes).first();
-      return handleStacks(gameClone).second();
-    },
-    ["second"]: () => {
-      if (isCompleted()) return gameClone;
-      const secondRes = handleStakes.second();
-      if (secondRes !== null) return handleStacks(secondRes).second();
-      return handleStacks(gameClone).third();
-    },
-    ["third"]: () => {
-      if (isCompleted()) return gameClone;
-      const thirdRes = handleStakes.third();
-      if (thirdRes !== null) return handleStacks(thirdRes).third();
-      return handleStacks(gameClone).first();
-    },
+const _handleAllStakes = () => {
+  const movementsHandler = _movementsHandler();
+  const instance = (game: AllStakes) => {
+    let gameClone = [...game];
+    const handler = movementsHandler(gameClone);
+    const isCompleted = _isCompleted(gameClone);
+    return {
+      ["first"]: () => {
+        if (isCompleted()) return gameClone;
+        const firstRes = handler.first();
+        if (firstRes !== null) return instance(firstRes).first();
+        return instance(gameClone).second();
+      },
+      ["second"]: () => {
+        if (isCompleted()) return gameClone;
+        const secondRes = handler.second();
+        if (secondRes !== null) return instance(secondRes).second();
+        return instance(gameClone).third();
+      },
+      ["third"]: () => {
+        if (isCompleted()) return gameClone;
+        const thirdRes = handler.third();
+        if (thirdRes !== null) return instance(thirdRes).third();
+        return instance(gameClone).first();
+      },
+    };
   };
+  return instance;
 };
 
-const _isCompleted = (game: Game) => {
+const _isCompleted = (game: AllStakes) => {
   return () => game[0].length === 0 && game[1].length === 0;
 };
 
-const _handleStake = (game: Game) => {
-  //   const moveWithMemo = move();
+const _movementsHandler = () => {
+  const moveWithMemo = move();
 
-  return {
-    // Privilégier les mouvements les + courts possibles (while?)
-    ["first"]: () => moveWithMemo(game, 0, 1) ?? moveWithMemo(game, 0, 2),
-    // Privilégier les mouvements vers l'avant à ceux vers l'arrière
-    ["second"]: () => moveWithMemo(game, 1, 2) ?? moveWithMemo(game, 1, 0),
-    // Reculer prioritairement jusqu'à 1ere pile
-    ["third"]: () => moveWithMemo(game, 2, 0) ?? moveWithMemo(game, 2, 1),
+  return (game: AllStakes) => {
+    return {
+      // Priority for shortest movement
+      ["first"]: () => moveWithMemo(game, 0, 1) ?? moveWithMemo(game, 0, 2),
+      // Priority for back movement
+      ["second"]: () => moveWithMemo(game, 1, 2) ?? moveWithMemo(game, 1, 0),
+      // Priority for movement to first stake
+      ["third"]: () => moveWithMemo(game, 2, 0) ?? moveWithMemo(game, 2, 1),
+    };
   };
 };
 
-// règles communes :
 const move = () => {
   let lastDiskMoved = null;
   let moveCount = 0;
 
   return (
-    game: Game,
+    game: AllStakes,
     originIndex: number,
     destinationIndex: number
-  ): Game | null => {
-    if (game[originIndex].length === 0) return null;
+  ): AllStakes | null => {
+    const originCol = game[originIndex];
+    const destinationCol = game[destinationIndex];
+
+    if (originCol.length === 0) return null;
     // Last movement cannot be repeated
-    if (game[originIndex][game[originIndex].length] === lastDiskMoved)
-      return null;
-    if (
-      game[originIndex][game[originIndex].length] >=
-      game[destinationIndex][game[destinationIndex].length]
-    )
+    if (originCol[originCol.length] === lastDiskMoved) return null;
+    // Move a disk onto a smaller disk is forbidden
+    if (originCol[originCol.length] >= destinationCol[destinationCol.length])
       return null;
 
     let gameClone = [...game];
@@ -115,7 +100,5 @@ const move = () => {
     return gameClone;
   };
 };
-
-const moveWithMemo = move();
 
 main(4);
