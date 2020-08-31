@@ -5,6 +5,9 @@
   "repository": "https://github.com/BLECUONA/fp-challenges.git",
   "author": "BLECUONA <benjaminlecuona@gmail.com>",
   "license": "MIT",
+  "scripts": {
+    "hanoi": "ts-node hanoi.ts"
+  },
   "dependencies": {
     "ts-node": "^9.0.0",
     "typescript": "^4.0.2"
