@@ -3,18 +3,24 @@ type Stake = Disk[];
 type AllStakes = Stake[];
 type ZeroAryFunction<T> = () => T;
 type UnaryFunction<T, U> = (x: T) => U;
+
+enum ColumnName {
+  first = "first",
+  second = "second",
+  third = "third",
+}
 type SingleMovementHandler = () => AllStakes | null;
 type MovementsHandler = (
   stakes: AllStakes
 ) => {
-  first: SingleMovementHandler;
-  second: SingleMovementHandler;
-  third: SingleMovementHandler;
+  [ColumnName.first]: SingleMovementHandler;
+  [ColumnName.second]: SingleMovementHandler;
+  [ColumnName.third]: SingleMovementHandler;
 };
 type MovementsHandlerObj = {
-  first: SingleMovementHandler;
-  second: SingleMovementHandler;
-  third: SingleMovementHandler;
+  [ColumnName.first]: SingleMovementHandler;
+  [ColumnName.second]: SingleMovementHandler;
+  [ColumnName.third]: SingleMovementHandler;
 };
 
 const main = (size: number) => {
@@ -49,9 +55,12 @@ const _handleAllStakes = () => {
       instance
     );
     return {
-      ["first"]: () => partialStakeHandler("first", "second"),
-      ["second"]: () => partialStakeHandler("second", "third"),
-      ["third"]: () => partialStakeHandler("third", "first"),
+      [ColumnName.first]: () =>
+        partialStakeHandler(ColumnName.first, ColumnName.second),
+      [ColumnName.second]: () =>
+        partialStakeHandler(ColumnName.second, ColumnName.third),
+      [ColumnName.third]: () =>
+        partialStakeHandler(ColumnName.third, ColumnName.first),
     };
   };
   return instance;
@@ -62,7 +71,7 @@ const _partialStakeHandler = (
   handler: MovementsHandlerObj,
   instance: MovementsHandler
 ) => {
-  return (currentColumn: string, nextColumn: string) =>
+  return (currentColumn: ColumnName, nextColumn: ColumnName) =>
     stakeHandler(stakes, handler, instance, currentColumn, nextColumn);
 };
 
@@ -70,8 +79,8 @@ const stakeHandler = (
   stakes: AllStakes,
   handler: MovementsHandlerObj,
   instance: MovementsHandler,
-  currentColumn: string,
-  nextColumn: string
+  currentColumn: ColumnName,
+  nextColumn: ColumnName
 ) => {
   return _isCompleted(stakes)
     ? stakes
@@ -97,12 +106,14 @@ const _movementsHandler = (): MovementsHandler => {
   return (stakes: AllStakes) => {
     return {
       // Priority for shortest movement
-      ["first"]: () => moveWithMemo(stakes, 0, 1) ?? moveWithMemo(stakes, 0, 2),
+      [ColumnName.first]: () =>
+        moveWithMemo(stakes, 0, 1) ?? moveWithMemo(stakes, 0, 2),
       // Priority for back movement
-      ["second"]: () =>
+      [ColumnName.second]: () =>
         moveWithMemo(stakes, 1, 2) ?? moveWithMemo(stakes, 1, 0),
       // Priority for movement to first stake
-      ["third"]: () => moveWithMemo(stakes, 2, 0) ?? moveWithMemo(stakes, 2, 1),
+      [ColumnName.third]: () =>
+        moveWithMemo(stakes, 2, 0) ?? moveWithMemo(stakes, 2, 1),
     };
   };
 };
