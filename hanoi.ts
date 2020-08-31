@@ -1,6 +1,21 @@
 type Disk = number;
 type Stake = Disk[];
 type AllStakes = Stake[];
+type ZeroAryFunction<T> = () => T;
+type UnaryFunction<T, U> = (x: T) => U;
+type SingleMovementHandler = () => AllStakes | null;
+type MovementsHandler = (
+  stakes: AllStakes
+) => {
+  first: SingleMovementHandler;
+  second: SingleMovementHandler;
+  third: SingleMovementHandler;
+};
+type MovementsHandlerObj = {
+  first: SingleMovementHandler;
+  second: SingleMovementHandler;
+  third: SingleMovementHandler;
+};
 
 const main = (size: number) => {
   let input = _initStakes(size);
@@ -25,49 +40,69 @@ const _createStake = (size: number): Stake => {
 
 const _handleAllStakes = () => {
   const movementsHandler = _movementsHandler();
-  const instance = (game: AllStakes) => {
-    let gameClone = [...game];
-    const handler = movementsHandler(gameClone);
-    const isCompleted = _isCompleted(gameClone);
+  const instance = (stakes: AllStakes) => {
+    let stakesClone = [...stakes];
+    const movesHandler = movementsHandler(stakesClone);
+    const partialStakeHandler = _partialStakeHandler(
+      stakesClone,
+      movesHandler,
+      instance
+    );
     return {
-      ["first"]: () => {
-        if (isCompleted()) return gameClone;
-        const firstRes = handler.first();
-        if (firstRes !== null) return instance(firstRes).first();
-        return instance(gameClone).second();
-      },
-      ["second"]: () => {
-        if (isCompleted()) return gameClone;
-        const secondRes = handler.second();
-        if (secondRes !== null) return instance(secondRes).second();
-        return instance(gameClone).third();
-      },
-      ["third"]: () => {
-        if (isCompleted()) return gameClone;
-        const thirdRes = handler.third();
-        if (thirdRes !== null) return instance(thirdRes).third();
-        return instance(gameClone).first();
-      },
+      ["first"]: () => partialStakeHandler("first", "second"),
+      ["second"]: () => partialStakeHandler("second", "third"),
+      ["third"]: () => partialStakeHandler("third", "first"),
     };
   };
   return instance;
 };
 
-const _isCompleted = (game: AllStakes) => {
-  return () => game[0].length === 0 && game[1].length === 0;
+const _partialStakeHandler = (
+  stakes: AllStakes,
+  handler: MovementsHandlerObj,
+  instance: MovementsHandler
+) => {
+  return (currentColumn: string, nextColumn: string) =>
+    stakeHandler(stakes, handler, instance, currentColumn, nextColumn);
 };
 
-const _movementsHandler = () => {
+const stakeHandler = (
+  stakes: AllStakes,
+  handler: MovementsHandlerObj,
+  instance: MovementsHandler,
+  currentColumn: string,
+  nextColumn: string
+) => {
+  return _isCompleted(stakes)
+    ? stakes
+    : compose(
+        () => handler[currentColumn](),
+        (x) =>
+          x !== null
+            ? instance(x)[currentColumn]()
+            : instance(stakes)[nextColumn]()
+      )();
+};
+
+const compose = <T, U>(f: ZeroAryFunction<T>, g: UnaryFunction<T, U>) => {
+  return () => g(f());
+};
+
+const _isCompleted = (stakes: AllStakes) =>
+  stakes[0].length === 0 && stakes[1].length === 0;
+
+const _movementsHandler = (): MovementsHandler => {
   const moveWithMemo = move();
 
-  return (game: AllStakes) => {
+  return (stakes: AllStakes) => {
     return {
       // Priority for shortest movement
-      ["first"]: () => moveWithMemo(game, 0, 1) ?? moveWithMemo(game, 0, 2),
+      ["first"]: () => moveWithMemo(stakes, 0, 1) ?? moveWithMemo(stakes, 0, 2),
       // Priority for back movement
-      ["second"]: () => moveWithMemo(game, 1, 2) ?? moveWithMemo(game, 1, 0),
+      ["second"]: () =>
+        moveWithMemo(stakes, 1, 2) ?? moveWithMemo(stakes, 1, 0),
       // Priority for movement to first stake
-      ["third"]: () => moveWithMemo(game, 2, 0) ?? moveWithMemo(game, 2, 1),
+      ["third"]: () => moveWithMemo(stakes, 2, 0) ?? moveWithMemo(stakes, 2, 1),
     };
   };
 };
@@ -77,12 +112,12 @@ const move = () => {
   let moveCount = 0;
 
   return (
-    game: AllStakes,
+    stakes: AllStakes,
     originIndex: number,
     destinationIndex: number
   ): AllStakes | null => {
-    const originCol = game[originIndex];
-    const destinationCol = game[destinationIndex];
+    const originCol = stakes[originIndex];
+    const destinationCol = stakes[destinationIndex];
 
     if (originCol.length === 0) return null;
     // Last movement cannot be repeated
@@ -91,14 +126,14 @@ const move = () => {
     if (originCol[originCol.length] >= destinationCol[destinationCol.length])
       return null;
 
-    let gameClone = [...game];
-    const movingDisk = gameClone[originIndex].pop();
-    gameClone[destinationIndex].push(Number(movingDisk));
+    let stakesClone = [...stakes];
+    const movingDisk = stakesClone[originIndex].pop();
+    stakesClone[destinationIndex].push(Number(movingDisk));
 
     moveCount += 1;
     console.log(`Number of movements: ${moveCount}`);
-    return gameClone;
+    return stakesClone;
   };
 };
 
-main(4);
+main(5);
