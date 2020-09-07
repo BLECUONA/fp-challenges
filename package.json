@@ -6,7 +6,8 @@
   "author": "BLECUONA <benjaminlecuona@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "hanoi": "ts-node hanoi.ts"
+    "hanoi": "ts-node hanoi.ts",
+    "8queens": "ts-node 8queens.ts"
   },
   "dependencies": {
     "ts-node": "^9.0.0",
