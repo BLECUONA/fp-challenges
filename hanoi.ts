@@ -44,16 +44,27 @@ const _createStake = (size: number): Stake => {
   return disks;
 };
 
+/** Apply appropriate handler for each stake */
 const _handleAllStakes = () => {
-  const movementsHandler = _movementsHandler();
+  // This instantiation is done only once, in order to share the same memo for next recursive logic
+  const movementsHandler = _movementsHandlerWithMemo();
+
+  //#region RECURSIVE LOGIC
+
+  // This exported function is named in order to be used recursively
   const instance = (stakes: AllStakes) => {
     let stakesClone = [...stakes];
+
     const movesHandler = movementsHandler(stakesClone);
+
+    // Initialization of _partialStakeHandler() with common params
     const partialStakeHandler = _partialStakeHandler(
       stakesClone,
       movesHandler,
       instance
     );
+
+    // Return function calling _partialStakeHandler() with all params
     return {
       [ColumnName.first]: () =>
         partialStakeHandler(ColumnName.first, ColumnName.second),
@@ -64,8 +75,11 @@ const _handleAllStakes = () => {
     };
   };
   return instance;
+
+  //#endregion RECURSIVE LOGIC
 };
 
+/**  Individual handler for each stake (using FP partial principle)  */
 const _partialStakeHandler = (
   stakes: AllStakes,
   handler: MovementsHandlerObj,
@@ -75,6 +89,7 @@ const _partialStakeHandler = (
     stakeHandler(stakes, handler, instance, currentColumn, nextColumn);
 };
 
+/** Individual generic stake handler */
 const stakeHandler = (
   stakes: AllStakes,
   handler: MovementsHandlerObj,
@@ -88,8 +103,8 @@ const stakeHandler = (
         () => handler[currentColumn](),
         (x) =>
           x !== null
-            ? instance(x)[currentColumn]()
-            : instance(stakes)[nextColumn]()
+            ? instance(x)[currentColumn]() // We continue to handle currentColumn because we don't know if other moves are possible on it
+            : instance(stakes)[nextColumn]() // We handle nextColumn because no more moves are possible on currentColumn
       )();
 };
 
@@ -100,9 +115,11 @@ const compose = <T, U>(f: ZeroAryFunction<T>, g: UnaryFunction<T, U>) => {
 const _isCompleted = (stakes: AllStakes) =>
   stakes[0].length === 0 && stakes[1].length === 0;
 
-const _movementsHandler = (): MovementsHandler => {
+/** Defined specific moves rules for each stake */
+const _movementsHandlerWithMemo = (): MovementsHandler => {
   const moveWithMemo = move();
 
+  // Function is returned with memoized move()
   return (stakes: AllStakes) => {
     return {
       // Priority for shortest movement
@@ -118,6 +135,10 @@ const _movementsHandler = (): MovementsHandler => {
   };
 };
 
+/**
+ * Defined common moves rules
+ * NB: We use memoization to forbid previous movement to be repeated
+ * */
 const move = () => {
   let lastDiskMoved = null;
   let moveCount = 0;
