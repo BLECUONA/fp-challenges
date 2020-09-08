@@ -1,10 +1,3 @@
-// faire un cellsVisibleByQueen
-
-// 1. placer une queen sur la 1ere cell dispo
-// 2. ajouter la liste des cells qu'elle voit à la liste de toutes celles vues par une reine quelconque
-// 3. placer la queen suivante sur la 1ere cell dispo
-// 4. Faire ça de maniere recursive, de façon à ce qu'a chaque "echec / blocage" on place la queen sur la cell dispo suivante
-
 type ChessMap = CellStatus[][];
 
 enum CellStatus {
@@ -13,10 +6,11 @@ enum CellStatus {
   occupied,
 }
 
-const mainQueen = () => {
+/** Main program */
+const mainQueen = (queensNumber: number) => {
   let initMap = _createMap();
 
-  const updatedMap = _solver(initMap)();
+  const updatedMap = _solver(initMap, queensNumber)();
 
   console.log(
     `RESULT (${CellStatus.occupied} -> Queen | ${CellStatus.visible} -> Visible by queens | ${CellStatus.free} -> Free & no visible by any queen)`
@@ -33,33 +27,42 @@ const _createMap = () => {
   return map;
 };
 
-const _solver = (initMap: ChessMap) => {
+/** Solver using memoization */
+const _solver = (initMap: ChessMap, queensNumber: number) => {
   let initRowMemo = 0;
   let initColumnMemo = 0;
 
+  const incrementMemo = () => {
+    if (initColumnMemo === 7 && initRowMemo <= 6) {
+      initRowMemo += 1;
+      initColumnMemo = 0;
+    } else if (initColumnMemo <= 6) {
+      initColumnMemo += 1;
+    } else if (initRowMemo === 7 && initColumnMemo === 7)
+      throw new Error("IMPOSSIBLE TO SOLVE");
+  };
+
+  // Returned function from _solver()
   const solve = () => {
     let updatedMap = deepClone(initMap);
 
-    let mapWithNewQueen = _placeQueenIfNotVisible(
+    let mapWithNewQueen = _placeQueenIfUnvisibleFromOthers(
       updatedMap,
       initRowMemo,
       initColumnMemo
     );
     if (mapWithNewQueen === null) {
-      // TODO: voir si vraiment utile
-      initRowMemo += 1;
-      initColumnMemo += 1;
+      incrementMemo();
       return solve();
     }
     updatedMap = mapWithNewQueen;
 
-    for (let index = 1; index < 8; index++) {
-      // TODO: remplacer 8 par une variable
-      for (let row = 0; row < 8; row++) {
+    for (let index = 1; index < queensNumber; index++) {
+      for (let row = 0; row < updatedMap.length; row++) {
         let haveToBeStopped: boolean = false;
 
-        for (let column = 0; column < 8; column++) {
-          const mapWithNewQueen = _placeQueenIfNotVisible(
+        for (let column = 0; column < updatedMap[0].length; column++) {
+          const mapWithNewQueen = _placeQueenIfUnvisibleFromOthers(
             updatedMap,
             row,
             column
@@ -71,16 +74,11 @@ const _solver = (initMap: ChessMap) => {
             break;
           }
 
-          if (column === 7 && row === 7) {
-            // TODO: voir à remplacer les number par des variables
-            if (initColumnMemo === 7 && initRowMemo <= 6) {
-              initRowMemo += 1;
-              initColumnMemo = 0;
-            } else if (initColumnMemo <= 6) {
-              initColumnMemo += 1;
-            } else if (initRowMemo === 7 && initColumnMemo === 7)
-              throw new Error("IMPOSSIBLE TO SOLVE");
-
+          if (
+            row === updatedMap.length - 1 &&
+            column === updatedMap[0].length - 1
+          ) {
+            incrementMemo();
             return solve();
           }
         }
@@ -93,41 +91,31 @@ const _solver = (initMap: ChessMap) => {
   return solve;
 };
 
-const _placeQueenIfNotVisible = (
+const _placeQueenIfUnvisibleFromOthers = (
   initMap: ChessMap,
   row: number,
   column: number
 ): ChessMap | null => {
-  if (
-    initMap[row][column] === CellStatus.visible ||
-    initMap[row][column] === CellStatus.occupied
-  )
-    return null;
+  if (_isOutsideRowsLimits(initMap, row)) return null;
+  if (_isOutsideColumnsLimits(initMap, column)) return null;
+  if (_cellAlreadyVisibleOrOccupied(initMap, column, row)) return null;
 
   const mapWithNewQueen = _placeQueenByForce(initMap, row, column);
 
-  if (mapWithNewQueen === null) return null;
-
-  return _immediateVisibilityFromCell(mapWithNewQueen, row, column);
+  return _addImmediateQueenVisibility(mapWithNewQueen, row, column);
 };
 
 const _placeQueenByForce = (
   map: ChessMap,
   row: number,
   column: number
-): ChessMap | null => {
+): ChessMap => {
   let mapClone = deepClone(map);
-  let cellToUpdate = mapClone[row][column];
-  if (
-    cellToUpdate === CellStatus.occupied ||
-    cellToUpdate === CellStatus.visible
-  )
-    return null;
   mapClone[row][column] = CellStatus.occupied;
   return mapClone;
 };
 
-const _immediateVisibilityFromCell = (
+const _addImmediateQueenVisibility = (
   map: ChessMap,
   row: number,
   column: number
@@ -135,12 +123,12 @@ const _immediateVisibilityFromCell = (
   let mapClone = deepClone(map);
 
   for (let rowDirection = -1; rowDirection <= 1; rowDirection++) {
-    if (_isOutsideRowsLimits(mapClone, row, rowDirection)) continue;
+    if (_isOutsideRowsLimits(mapClone, row + rowDirection)) continue;
     for (let columnDirection = -1; columnDirection <= 1; columnDirection++) {
-      if (_isOutsideColumnsLimits(mapClone, column, columnDirection)) continue;
+      if (_isOutsideColumnsLimits(mapClone, column + columnDirection)) continue;
       if (rowDirection === 0 && columnDirection === 0) continue;
 
-      const res = _innerVisibilityFromCell(
+      const res = _addDistantQueenVisibility(
         mapClone,
         row,
         column,
@@ -154,7 +142,7 @@ const _immediateVisibilityFromCell = (
   return mapClone;
 };
 
-const _innerVisibilityFromCell = (
+const _addDistantQueenVisibility = (
   map: ChessMap,
   row: number,
   column: number,
@@ -163,24 +151,22 @@ const _innerVisibilityFromCell = (
 ): ChessMap | null => {
   let mapClone = deepClone(map);
 
-  // Case 01 : Precoce return
+  // Case 01 : Exceptions
   if (
-    _isOutsideRowsLimits(mapClone, row, rowDirection) ||
-    _isOutsideColumnsLimits(mapClone, column, columnDirection)
+    _isOutsideRowsLimits(mapClone, row + rowDirection) ||
+    _isOutsideColumnsLimits(mapClone, column + columnDirection)
   )
     return mapClone;
 
   if (
-    _cellAlreadyOccupied(mapClone, column, columnDirection, row, rowDirection)
+    _cellAlreadyOccupied(mapClone, row + rowDirection, column + columnDirection)
   ) {
-    // console.log("_________ NULL HERE");
-    // return mapClone;
     return null;
   }
 
-  // Case 02 :Recursivity
+  // Case 02 : Recursivity
   mapClone[row + rowDirection][column + columnDirection] = CellStatus.visible;
-  return _innerVisibilityFromCell(
+  return _addDistantQueenVisibility(
     mapClone,
     row + rowDirection,
     column + columnDirection,
@@ -189,25 +175,22 @@ const _innerVisibilityFromCell = (
   );
 };
 
-const _isOutsideRowsLimits = (
-  map: ChessMap,
-  row: number,
-  rowDirection: number
-) => row + rowDirection < 0 || row + rowDirection >= map.length;
+const _isOutsideRowsLimits = (map: ChessMap, row: number) =>
+  row < 0 || row >= map.length;
 
-const _isOutsideColumnsLimits = (
+const _isOutsideColumnsLimits = (map: ChessMap, column: number) =>
+  column < 0 || column >= map[0].length;
+
+const _cellAlreadyOccupied = (map: ChessMap, row: number, column: number) =>
+  map[row][column] === CellStatus.occupied;
+
+const _cellAlreadyVisibleOrOccupied = (
   map: ChessMap,
   column: number,
-  columnDirection: number
-) => column + columnDirection < 0 || column + columnDirection >= map[0].length;
-
-const _cellAlreadyOccupied = (
-  map: ChessMap,
-  column: number,
-  columnDirection: number,
-  row: number,
-  rowDirection: number
-) => map[row + rowDirection][column + columnDirection] === CellStatus.occupied;
+  row: number
+) =>
+  map[row][column] === CellStatus.visible ||
+  map[row][column] === CellStatus.occupied;
 
 /** Clone basic nested arrays
  * i.e. : excludes dates, undefined, maps, blobs, etc
@@ -216,12 +199,10 @@ const _cellAlreadyOccupied = (
 const deepClone = (input: ChessMap): ChessMap =>
   JSON.parse(JSON.stringify(input));
 
-class AlreadyOccupiedError extends Error {}
-
 // ################################################
 // ################################################
 // ################# EXECUTION ####################
 // ################################################
 // ################################################
 
-mainQueen();
+mainQueen(8);
