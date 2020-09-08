@@ -89,7 +89,7 @@ const _partialStakeHandler = (
     stakeHandler(stakes, handler, instance, currentColumn, nextColumn);
 };
 
-/** Individual generic stake handler */
+/** Individual generic stake handler, using FP composition principle */
 const stakeHandler = (
   stakes: AllStakes,
   handler: MovementsHandlerObj,
@@ -115,7 +115,7 @@ const compose = <T, U>(f: ZeroAryFunction<T>, g: UnaryFunction<T, U>) => {
 const _isCompleted = (stakes: AllStakes) =>
   stakes[0].length === 0 && stakes[1].length === 0;
 
-/** Defined specific moves rules for each stake */
+/** Definition of specific moves rules for each stake */
 const _movementsHandlerWithMemo = (): MovementsHandler => {
   const moveWithMemo = move();
 
@@ -136,7 +136,7 @@ const _movementsHandlerWithMemo = (): MovementsHandler => {
 };
 
 /**
- * Defined common moves rules
+ * Definition of common moves rules
  * NB: We use memoization to forbid previous movement to be repeated
  * */
 const move = () => {
@@ -152,8 +152,10 @@ const move = () => {
     const destinationCol = stakes[destinationIndex];
 
     if (originCol.length === 0) return null;
+
     // Last movement cannot be repeated
     if (originCol[originCol.length] === lastDiskMoved) return null;
+
     // Move a disk onto a smaller disk is forbidden
     if (originCol[originCol.length] >= destinationCol[destinationCol.length])
       return null;
